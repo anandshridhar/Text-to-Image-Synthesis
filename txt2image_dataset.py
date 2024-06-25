@@ -9,6 +9,8 @@ import torch
 from torch.autograd import Variable
 import pdb
 import torch.nn.functional as F
+from transformers import XLNetTokenizer, XLNetModel
+
 
 class Text2ImageDataset(Dataset):
 
@@ -19,6 +21,9 @@ class Text2ImageDataset(Dataset):
         self.dataset_keys = None
         self.split = 'train' if split == 0 else 'valid' if split == 1 else 'test'
         self.h5py2int = lambda x: int(np.array(x))
+        self.tokenizer = XLNetTokenizer.from_pretrained('xlnet-base-cased')
+
+
 
     def __len__(self):
         f = h5py.File(self.datasetFile, 'r')
@@ -39,7 +44,7 @@ class Text2ImageDataset(Dataset):
         # pdb.set_trace()
 
         right_image = bytes(np.array(example['img']))
-        right_embed = np.array(example['embeddings'], dtype=float)
+        #right_embed = np.array(example['embeddings'], dtype=float)
         wrong_image = bytes(np.array(self.find_wrong_image(example['class'])))
         inter_embed = np.array(self.find_inter_embed())
 
@@ -49,8 +54,9 @@ class Text2ImageDataset(Dataset):
         right_image = self.validate_image(right_image)
         wrong_image = self.validate_image(wrong_image)
 
-        txt = np.array(example['txt']).astype(str)
+        txt = np.array(example['txt']).item().strip().decode('utf-8')
 
+        right_embed = np.array(self.get_XLNet_embeddings(txt), dtype=float)
         sample = {
                 'right_images': torch.FloatTensor(right_image),
                 'right_embed': torch.FloatTensor(right_embed),
@@ -63,7 +69,10 @@ class Text2ImageDataset(Dataset):
         sample['wrong_images'] =sample['wrong_images'].sub_(127.5).div_(127.5)
 
         return sample
-
+    # Added code for XLNet embeddings
+    def get_XLNet_embeddings(self, txt):
+        return self.tokenizer(txt, padding='max_length', max_length=1024).input_ids
+        
     def find_wrong_image(self, category):
         idx = np.random.randint(len(self.dataset_keys))
         example_name = self.dataset_keys[idx]
@@ -79,7 +88,8 @@ class Text2ImageDataset(Dataset):
         idx = np.random.randint(len(self.dataset_keys))
         example_name = self.dataset_keys[idx]
         example = self.dataset[self.split][example_name]
-        return example['embeddings']
+        txt = np.array(example['txt']).item().strip().decode('utf-8')
+        return self.get_XLNet_embeddings(txt)
 
 
     def validate_image(self, img):
