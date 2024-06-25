@@ -1,0 +1,7 @@
+torch
+visdom
+h5py
+pillow
+numpy
+PyYAML
+torchvision
