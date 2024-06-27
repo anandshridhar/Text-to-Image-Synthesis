@@ -22,7 +22,8 @@ class Text2ImageDataset(Dataset):
         self.split = 'train' if split == 0 else 'valid' if split == 1 else 'test'
         self.h5py2int = lambda x: int(np.array(x))
         self.tokenizer = XLNetTokenizer.from_pretrained('xlnet-base-cased')
-
+        self.model = XLNetModel.from_pretrained('xlnet-base-cased')
+        self.model.eval()
 
 
     def __len__(self):
@@ -71,7 +72,18 @@ class Text2ImageDataset(Dataset):
         return sample
     # Added code for XLNet embeddings
     def get_XLNet_embeddings(self, txt):
-        return self.tokenizer(txt, padding='max_length', max_length=1024).input_ids
+        inputs = self.tokenizer(txt, return_tensors="pt", padding='max_length', max_length=1024)
+        with torch.no_grad():
+            outputs = self.model(**inputs)
+        #print (len(outputs.last_hidden_state.squeeze(0).mean(dim=0).numpy()) )
+        embeddings = outputs.last_hidden_state.squeeze(0).mean(dim=0).numpy()
+
+        # Pad embeddings to length 1024
+        if embeddings.shape[0] < 1024:
+            pad_width = 1024 - embeddings.shape[0]
+            embeddings = np.pad(embeddings, (0, pad_width), 'constant')
+
+        return embeddings
         
     def find_wrong_image(self, category):
         idx = np.random.randint(len(self.dataset_keys))
