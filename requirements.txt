@@ -5,3 +5,5 @@ pillow
 numpy
 PyYAML
 torchvision
+transformers
+sentencepiece
