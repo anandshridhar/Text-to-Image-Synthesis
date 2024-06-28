@@ -7,3 +7,4 @@ PyYAML
 torchvision
 transformers
 sentencepiece
+opencv-contrib-python
