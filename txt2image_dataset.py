@@ -1,4 +1,4 @@
-import os
+import os, sys
 import io
 from torch.utils.data import Dataset, DataLoader
 import h5py
@@ -14,16 +14,14 @@ from transformers import XLNetTokenizer, XLNetModel
 
 class Text2ImageDataset(Dataset):
 
-    def __init__(self, datasetFile, transform=None, split=0):
+    def __init__(self, datasetFile, embeddings_file, transform=None, split=0):
         self.datasetFile = datasetFile
         self.transform = transform
         self.dataset = None
         self.dataset_keys = None
         self.split = 'train' if split == 0 else 'valid' if split == 1 else 'test'
         self.h5py2int = lambda x: int(np.array(x))
-        self.tokenizer = XLNetTokenizer.from_pretrained('xlnet-base-cased')
-        self.model = XLNetModel.from_pretrained('xlnet-base-cased')
-        self.model.eval()
+        self.embeddings = np.load(embeddings_file, allow_pickle=True).item()
 
 
     def __len__(self):
@@ -55,36 +53,52 @@ class Text2ImageDataset(Dataset):
         right_image = self.validate_image(right_image)
         wrong_image = self.validate_image(wrong_image)
 
-        txt = np.array(example['txt']).item().strip().decode('utf-8')
+        right_embed = self.embeddings[example_name]
 
-        right_embed = np.array(self.get_XLNet_embeddings(txt), dtype=float)
+
+  
         sample = {
                 'right_images': torch.FloatTensor(right_image),
                 'right_embed': torch.FloatTensor(right_embed),
                 'wrong_images': torch.FloatTensor(wrong_image),
                 'inter_embed': torch.FloatTensor(inter_embed),
-                'txt': str(txt)
+                'txt': np.array(example['txt']).item().strip().decode('utf-8')
                  }
 
         sample['right_images'] = sample['right_images'].sub_(127.5).div_(127.5)
         sample['wrong_images'] =sample['wrong_images'].sub_(127.5).div_(127.5)
 
         return sample
-    # Added code for XLNet embeddings
-    def get_XLNet_embeddings(self, txt):
-        inputs = self.tokenizer(txt, return_tensors="pt", padding='max_length', max_length=1024)
-        with torch.no_grad():
-            outputs = self.model(**inputs)
-        #print (len(outputs.last_hidden_state.squeeze(0).mean(dim=0).numpy()) )
-        embeddings = outputs.last_hidden_state.squeeze(0).mean(dim=0).numpy()
 
-        # Pad embeddings to length 1024
-        if embeddings.shape[0] < 1024:
-            pad_width = 1024 - embeddings.shape[0]
-            embeddings = np.pad(embeddings, (0, pad_width), 'constant')
-
-        return embeddings
+# Code added for precomuting XLNet embeddings
+    @staticmethod
+    def compute_and_save_embeddings(dataset_file, split, output_file, embedding_dim=1024):
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        tokenizer = XLNetTokenizer.from_pretrained('xlnet-base-cased')
+        model = XLNetModel.from_pretrained('xlnet-base-cased').to(device)
+        model.eval()
+        embeddings = {}
+        with h5py.File(dataset_file, 'r') as f:
+            dataset_keys = [str(k) for k in f[split].keys()]
         
+        
+            with torch.no_grad():
+                print('Calculating XLNet Embeddings for {}'.format(split))
+                dataset_size = len(dataset_keys)
+                for inc, key in enumerate(dataset_keys):
+                    print('{}/{}'.format(inc + 1, dataset_size))
+                    example = f[split][key]
+                    txt = example['txt'][()].strip().decode('utf-8')
+                    inputs = tokenizer(txt, return_tensors="pt", padding='max_length', max_length=128).to(device)
+                    outputs = model(**inputs)
+                    embedding = outputs.last_hidden_state.squeeze(0).mean(dim=0).cpu().numpy()
+                    # Pad the embedding to the desired length
+                    if embedding.shape[0] < embedding_dim:
+                        embedding = np.pad(embedding, (0, embedding_dim - embedding.shape[0]), 'constant')
+                    embeddings[key] = embedding
+            print('Finished XLNet Embedding calculations')
+        np.save(output_file, embeddings)
+         
     def find_wrong_image(self, category):
         idx = np.random.randint(len(self.dataset_keys))
         example_name = self.dataset_keys[idx]
@@ -99,9 +113,8 @@ class Text2ImageDataset(Dataset):
     def find_inter_embed(self):
         idx = np.random.randint(len(self.dataset_keys))
         example_name = self.dataset_keys[idx]
-        example = self.dataset[self.split][example_name]
-        txt = np.array(example['txt']).item().strip().decode('utf-8')
-        return self.get_XLNet_embeddings(txt)
+        return self.embeddings[example_name]
+ 
 
 
     def validate_image(self, img):

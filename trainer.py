@@ -15,7 +15,7 @@ class Trainer(object):
     def __init__(self, type, dataset, split, lr, diter, vis_screen, save_path, l1_coef, l2_coef, pre_trained_gen, pre_trained_disc, batch_size, num_workers, epochs):
         with open('config.yaml', 'r') as f:
             config = yaml.safe_load(f)
-
+        self.split_name = 'train' if split == 0 else 'valid' if split == 1 else 'test'
         self.generator = torch.nn.DataParallel(gan_factory.generator_factory(type).cuda())
         self.discriminator = torch.nn.DataParallel(gan_factory.discriminator_factory(type).cuda())
 
@@ -29,10 +29,22 @@ class Trainer(object):
         else:
             self.generator.apply(Utils.weights_init)
 
+        # Code for generating XLNetembeddings if it doesn't exist
+        if os.path.exists(os.path.join(config['xlnet_path'],'{}_embeddings.npy'.format(self.split_name))):
+            self.embeddings_file = os.path.join(config['xlnet_path'],'{}_embeddings.npy'.format(self.split_name))
+        else:
+            os.makedirs(os.path.dirname(config['xlnet_path']), exist_ok=True)
+            if dataset == 'birds':
+                Text2ImageDataset.compute_and_save_embeddings(config['birds_dataset_path'], self.split_name, os.path.join(config['xlnet_path'],'{}_embeddings.npy'.format(self.split_name)))
+            elif dataset == 'flowers':
+                Text2ImageDataset.compute_and_save_embeddings(config['flowers_dataset_path'], self.split_name, os.path.join(config['xlnet_path'],'{}_embeddings.npy'.format(self.split_name)))
+            self.embeddings_file = os.path.join(config['xlnet_path'],'{}_embeddings.npy'.format(self.split_name)) 
+
+
         if dataset == 'birds':
-            self.dataset = Text2ImageDataset(config['birds_dataset_path'], split=split)
+            self.dataset = Text2ImageDataset(config['birds_dataset_path'], self.embeddings_file, split=split)
         elif dataset == 'flowers':
-            self.dataset = Text2ImageDataset(config['flowers_dataset_path'], split=split)
+            self.dataset = Text2ImageDataset(config['flowers_dataset_path'], self.embeddings_file,  split=split)
         else:
             print('Dataset not supported, please select either birds or flowers.')
             exit()

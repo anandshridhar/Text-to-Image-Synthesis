@@ -22,3 +22,6 @@ flowers_test_split_path: '/export/mlrg/aelnouby/projects/GANs/flowers_dataset/fl
 
 # Location of the ESPCN Model
 espcn_path: '/groups/ldbrown/t1capstone/kaggle/ESPCN/espcn_model.pth'
+
+# Locations to save XLNey embeddings calculation
+xlnet_path: '/groups/ldbrown/t1capstone/anand_code/embeddings'
