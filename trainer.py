@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader
 
 from txt2image_dataset import Text2ImageDataset
 from models.gan_factory import gan_factory
+from models.espcn import ESPCN
 from utils import Utils, Logger
 from PIL import Image
 import os
@@ -18,7 +19,7 @@ class Trainer(object):
         self.split_name = 'train' if split == 0 else 'valid' if split == 1 else 'test'
         self.generator = torch.nn.DataParallel(gan_factory.generator_factory(type).cuda())
         self.discriminator = torch.nn.DataParallel(gan_factory.discriminator_factory(type).cuda())
-
+        self.espcn_path = config['espcn_path']
         if pre_trained_disc:
             self.discriminator.load_state_dict(torch.load(pre_trained_disc))
         else:
@@ -430,6 +431,9 @@ class Trainer(object):
                 Utils.save_checkpoint(self.discriminator, self.generator, self.checkpoints_path, epoch)
 
     def predict(self):
+        espcn = ESPCN(scale_factor=3).cuda()  # Initialize the ESPCN model
+        espcn.load_state_dict(torch.load(self.espcn_path))  # Load pre-trained weights if available
+        espcn.eval()
         for sample in self.data_loader:
             right_images = sample['right_images']
             right_embed = sample['right_embed']
@@ -445,12 +449,15 @@ class Trainer(object):
             noise = Variable(torch.randn(right_images.size(0), 100)).cuda()
             noise = noise.view(noise.size(0), 100, 1, 1)
             fake_images = self.generator(right_embed, noise)
-
+ 
             self.logger.draw(right_images, fake_images)
 
             for image, t in zip(fake_images, txt):
                 im = Image.fromarray(image.data.mul_(127.5).add_(127.5).byte().permute(1, 2, 0).cpu().numpy())
                 im.save('results/{0}/{1}.jpg'.format(self.save_path, t.replace("/", "")[:100]))
+                high_res_image = espcn(image.unsqueeze(0)).squeeze()
+                high_res_image = Image.fromarray(high_res_image.byte().permute(1, 2, 0).cpu().numpy())
+                high_res_image.save('espcn_results/{0}/high_res_{1}.jpg'.format(self.save_path, t.replace("/", "")[:100]))
                 print(t)
 
 
