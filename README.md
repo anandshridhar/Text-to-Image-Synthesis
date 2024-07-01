@@ -2,35 +2,22 @@
 
 ## Intoduction
 
-This is a pytorch implementation of [Generative Adversarial Text-to-Image Synthesis paper](https://arxiv.org/abs/1605.05396), we train a conditional generative adversarial network, conditioned on text descriptions, to generate images that correspond to the description. The network architecture is shown below (Image from [1]). This architecture is based on DCGAN.
-
-<figure><img src='images/pipeline.png'></figure>
-Image credits [1]
+This is a pytorch implementation of [Generative Adversarial Text-to-Image Synthesis paper](https://arxiv.org/abs/1605.05396), forked from https://github.com/aelnouby/Text-to-Image-Synthesis. To this implementation we have added XLNet based embeddings and ESPCN super resolution.
+<figure><img src='images/Pipeline.png'></figure>
 
 ## Requirements
-
-- pytorch 
-- visdom
-- h5py
-- PIL
-- numpy
-
+All requirements have been added to requirements.txt. All requirements can be automatically installed via `pip install -r requirements.txt`
 This implementation currently only support running with GPUs.
 
 ## Implementation details
 
-This implementation follows the Generative Adversarial Text-to-Image Synthesis paper [1], however it works more on training stablization and preventing mode collapses by implementing:
-- Feature matching [2]
-- One sided label smoothing [2]
-- minibatch discrimination [2] (implemented but not used)
-- WGAN [3]
-- WGAN-GP [4] (implemented but not used)
+This implementation follows the base https://github.com/aelnouby/Text-to-Image-Synthesis
+We have added XLNet based text embeddings into the pipeline as well as ESPCN based super resolution model
+
 
 ## Datasets
 
-We used [Caltech-UCSD Birds 200](http://www.vision.caltech.edu/visipedia/CUB-200.html) and [Flowers](http://www.robots.ox.ac.uk/~vgg/data/flowers/102/) datasets, we converted each dataset (images, text embeddings) to hd5 format. 
-
-We used the [text embeddings](https://github.com/reedscot/icml2016) provided by the paper authors
+We used [Flowers](http://www.robots.ox.ac.uk/~vgg/data/flowers/102/) dataset, we converted each dataset (images, text embeddings) to hd5 format. 
 
 **To use this code you can either:**
 
@@ -51,6 +38,13 @@ We used the [text embeddings](https://github.com/reedscot/icml2016) provided by 
       - 'txt'
       
 ## Usage
+It would be recommeded to create a virtual environment before running the project
+```
+git clone https://github.com/anandshridhar/Text-to-Image-Synthesis.git
+cd Text-to-Image-Synthesis
+pip install -r requirements.txt
+python -m visdom.server&
+```
 ### Training
 
 `python runtime.py
@@ -94,14 +88,8 @@ We used the [text embeddings](https://github.com/reedscot/icml2016) provided by 
 ## References
 [1]  Generative Adversarial Text-to-Image Synthesis https://arxiv.org/abs/1605.05396
 
-[2]  Improved Techniques for Training GANs https://arxiv.org/abs/1606.03498
+[2]  5.	Yang, Z., Dai, Z., Yang, Y., Carbonell, J., Salakhutdinov, R. R., & Le, Q. V. (2019). XLNet: Generalized Autoregressive Pretraining for Language Understanding. arXiv preprint arXiv:[1906.08237] XLNet: Generalized Autoregressive Pretraining for Language Understanding (arxiv.org)
 
-[3]  Wasserstein GAN https://arxiv.org/abs/1701.07875
-
-[4] Improved Training of Wasserstein GANs https://arxiv.org/pdf/1704.00028.pdf
+[3]  7.	Shi, W., et al. "Real-Time Single Image and Video Super-Resolution Using an Efficient Sub-Pixel Convolutional Neural Network." Papers with Code, https://paperswithcode.com/paper/real-time-single-image-and-video-super.
 
 
-## Other Implementations
-
-1. https://github.com/reedscot/icml2016 (the authors version)
-2. https://github.com/paarthneekhara/text-to-image (tensorflow)
